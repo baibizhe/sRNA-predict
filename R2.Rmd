@@ -1,0 +1,97 @@
+---
+title: "cell"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r }
+library(SeuratDisk)
+library(Seurat)
+library(future)
+library(ggplot2)
+slices <- 800000
+options(future.globals.maxSize = 10000 * 1024^2)
+plan("multicore", workers = 4) 
+
+if(! file.exists("test.hidden.h5seurat")){
+  Convert("testhidden_csr.h5ad", "test.hidden.h5seurat")
+}
+#seuratObject <- LoadH5Seurat("train.h5Seurat")
+
+seuratObjectALL <- LoadH5Seurat("test.hidden.h5seurat")
+donor_ids = levels(seuratObjectALL$donor_id)
+```
+```{r}
+
+par(mfrow=c(3,5))
+final_result = data.frame(cell_id=c(),level4=c())
+for(donor in donor_ids) {
+  seuratObject = seuratObjectALL[,seuratObjectALL$donor_id==donor]
+  seuratObject <- NormalizeData(seuratObject)[,0:slices]
+  seuratObject <- FindVariableFeatures(seuratObject)
+  seuratObject <- ScaleData(seuratObject)
+  seuratObject <- RunPCA(seuratObject, features = VariableFeatures(object = seuratObject))
+  seuratObject <- RunUMAP(seuratObject, dims = 1:30)
+  seuratObject <- FindNeighbors(seuratObject, dims = 1:30, k.param = 30)
+  seuratObject <- FindClusters(seuratObject, resolution = 0.5)
+  p_umap2 <-DimPlot(seuratObject, reduction = "umap",label = TRUE, pt.size=1)
+  p_umap2
+  ggsave(paste0(donor,"seurat.umap.png"), plot = p_umap2, width = 4, height = 4)
+  new.cluster.ids<-c(1:length(levels(seuratObject)))
+  names(new.cluster.ids) <- levels(seuratObject)
+  seuratObject <- RenameIdents(seuratObject, new.cluster.ids)
+  plot <- DimPlot(seuratObject, reduction = "umap",label = TRUE, pt.size = 0.1) + NoLegend()
+  ggsave("predict.png", plot = plot, width = 8, height = 5)
+  
+  seuratObject@meta.data$hcad.label <- Idents(seuratObject)
+
+   df_hca <- data.frame(cell_id=rownames(seuratObject@meta.data),level4=seuratObject@meta.data$hcad.label)
+   final_result<-rbind(final_result,df_hca)
+   print(final_result)
+
+
+
+  # write.table(seuratObject.markers, file = "seurat.markers.txt", sep = "\t", quote = F, row.names = F, col.names = T)
+}
+ write.csv(final_result, file = "level4testb.hcad.csv",sep = "\t",quote = F, row.names = F, col.names = T)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+```{r}
+
+
+# df_hca <- data.frame(cell_id=rownames(seuratObject@meta.data),level4=seuratObject@meta.data$hcad.label)
+# write.table(df_hca, file = "annotation.hcad.csv", sep = " ", quote = F, row.names = F, col.names = T)
+# write.csv(df_hca, file = "d2level4.hcad.csv",sep = "\t",quote = F, row.names = F, col.names = T)
+
+```
+```{r}
+# seuratObject.markers <- FindAllMarkers(seuratObject,  test.use='wilcox', min.pct=0.2, thresh.use=0.2, min.diff.pct=0.1, only.positive=TRUE, return.thresh=0.05)
+# write.table(dataobj.markers, file = paste0("testd1.seurat.markers.txt"), sep = "\t", quote = F, row.names = F, col.names = T)
+```
+
